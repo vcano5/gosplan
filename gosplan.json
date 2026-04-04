@@ -1,0 +1,16 @@
+{
+    "projectName": "todoapp",
+    "schema": {
+        "tasks": {
+            "title": "string|@required",
+            "description": "text",
+            "completed": "boolean|@default(false)",
+            "userId": "uuid|@required|@ref:users.id",
+            "parentId": "uuid|@required|@ref:tasks.id"
+        },
+        "users": {
+            "name": "string|@required",
+            "password": "string|@required|@default(password_hash())"
+        }
+    }
+}
