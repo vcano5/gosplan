@@ -6,11 +6,12 @@
             "description": "text",
             "completed": "boolean|@default(false)",
             "userId": "uuid|@required|@ref:users.id",
-            "parentId": "uuid|@required|@ref:tasks.id"
+            "parentId": "uuid|@nullable|@ref:tasks.id"
         },
         "users": {
             "name": "string|@required",
-            "password": "string|@required|@default(password_hash())"
+            "password": "string|@required|@default(password_hash())",
+            "role": "string|@default(user)|@values(admin, editor, user)"
         }
     }
 }

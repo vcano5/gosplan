@@ -19,25 +19,8 @@ echo "=== PRAVDA TEST SUITE ===\n\n";
 // ─── 1. Parser ────────────────────────── ──────────────────────────────────────
 echo "── Parser ──────────────────────────────────────────────\n";
 
-$gosplan = [
-    'projectName' => 'todoapp',
-    'schema' => [
-        'tasks' => [
-            'title'       => 'string|@required',
-            'description' => 'text',
-            'completed'   => 'boolean|@default(false)',
-            'userId'      => 'uuid|@required|@ref:users.id',
-            'parentId'    => 'uuid|@nullable|@ref:tasks.id',
-        ],
-        'users' => [
-            'name'     => 'string|@required',
-            'password' => 'string|@required|@default(password_hash())',
-            'role'     => 'string|@default(user)|@values(admin,editor,user)',
-        ],
-    ],
-];
 
-$parsed = Parser::parse($gosplan);
+$parsed = Parser::parseFile("gosplan.json");
 
 echo "Tabla 'tasks' → campo 'title':\n";
 print_r($parsed['schema']['tasks']['title']);

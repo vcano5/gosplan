@@ -33,10 +33,17 @@ class Parser {
     ];
 
     public static function parseFile(string $filePath): array {
-        if(!file_exists($filePath)) {
-            throw new \RuntimeException("file not found at: {$filePath}");
+        if (!file_exists($filePath)) {
+            throw new \RuntimeException("Archivo no encontrado en: {$filePath}");
         }
-        $decoded = yaml_parse_file($filePath);
+ 
+        $raw = file_get_contents($filePath);
+        $decoded = json_decode($raw, true);
+ 
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \RuntimeException('Archivo inválido: ' . json_last_error_msg());
+        }
+ 
         return self::parse($decoded);
     }
 
