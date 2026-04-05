@@ -93,9 +93,13 @@ class Parser {
 
     public static function parseField(string $definition): array {
         $tokens = explode("|", $definition);
-        $rawType = strtolower(trim(array_shift($tokens)));
+        $rawType = trim(array_shift($tokens));
+
+        $parsedType = TypeParser::parse($rawType);
+        $sqlType = TypeMapper::toSQL($parsedType);
+        
         $field = [
-            "type" => self::resolveType($rawType),
+            "type" => $sqlType,
             "required" => false,
             "primary" => false,
             "unsigned" => false,
@@ -116,14 +120,23 @@ class Parser {
         return $field;
     }
 
+    /**
+     * @deprecated Use TypeParser y TypeMapper en su lugar
+     */
     public static function resolveType(string $rawType): string {
-        if(preg_match('/^(\w+)\((.+)\)$/', $rawType, $matches)) {
-            $base = strtolower($matches[1]);
-            $params = $matches[2];
-            $mapped = self::TYPE_MAP[$base] ?? strtoupper($base);
-            return preg_replace('/\(.*\)/', "({$params})", $mapped) ?: $mapped;
+        try {
+            $parsed = TypeParser::parse($rawType);
+            return TypeMapper::toSQL($parsed);
+        } catch (\Exception $e) {
+            // Fallback al TYPE_MAP legacy
+            if(preg_match('/^(\w+)\((.+)\)$/', $rawType, $matches)) {
+                $base = strtolower($matches[1]);
+                $params = $matches[2];
+                $mapped = self::TYPE_MAP[$base] ?? strtoupper($base);
+                return preg_replace('/\(.*\)/', "({$params})", $mapped) ?: $mapped;
+            }
+            return self::TYPE_MAP[strtolower($rawType)] ?? strtoupper($rawType);
         }
-        return self::TYPE_MAP[$rawType] ?? strtoupper($rawType);
     }
 
     private static function applyDirective(array &$field, string $token, string $rawType): void
@@ -153,14 +166,40 @@ class Parser {
             // @unsigned
             $token === '@unsigned' => ($field['unsigned'] = true),
  
-            // @ref:tabla.columna
+            // @ref:tabla.columna o @ref:tabla.columna(delete:CASCADE,update:CASCADE)
             str_starts_with($token, '@ref:') => (function() use (&$field, $token) {
-                $ref = substr($token, 5); // quita "@ref:"
-                [$refTable, $refColumn] = explode('.', $ref, 2);
-                $field['ref'] = [
+                $refContent = substr($token, 5); 
+                if (preg_match('/^([^(]+)\((.+)\)$/', $refContent, $matches)) {
+                    $tableColumn = $matches[1];
+                    $paramsStr = $matches[2];
+                } else {
+                    $tableColumn = $refContent;
+                    $paramsStr = null;
+                }
+                
+                [$refTable, $refColumn] = explode('.', $tableColumn, 2);
+                
+                $ref = [
                     'table'  => trim($refTable),
                     'column' => trim($refColumn),
                 ];
+                
+                if ($paramsStr) {
+                    $params = array_map('trim', explode(',', $paramsStr));
+                    foreach ($params as $param) {
+                        if (preg_match('/^(\w+):([a-zA-Z-]+)$/', $param, $pm)) {
+                            $key = strtolower($pm[1]);
+                            $rawVal = strtoupper(str_replace('-', ' ', $pm[2]));
+                            if (in_array($key, ['delete', 'update'])) {
+                                if (in_array($rawVal, ['CASCADE', 'RESTRICT', 'SET NULL', 'NO ACTION', 'SET DEFAULT'])) {
+                                    $ref[$key] = $rawVal;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                $field['ref'] = $ref;
             })(),
  
             // @default(valor) o @default(funcion())
@@ -169,12 +208,11 @@ class Parser {
                 preg_match('/@default\((.+)\)/', $token, $m);
                 $inner = trim($m[1] ?? '');
  
-                // ¿Es una llamada a función? termina en ()
                 if (preg_match('/^([a-zA-Z_]\w*)\(\)$/', $inner, $fn)) {
                     $field['function'] = $fn[1]; // "password_hash"
                     $field['default']  = null;
-                } else {
-                    // Valor literal — normaliza booleans
+                } 
+                else {
                     $field['default'] = match(strtolower($inner)) {
                         'true'  => true,
                         'false' => false,

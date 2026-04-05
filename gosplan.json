@@ -2,16 +2,28 @@
     "projectName": "todoapp",
     "schema": {
         "tasks": {
-            "title": "string|@required",
+            "title": "string(255)|@required",
             "description": "text",
             "completed": "boolean|@default(false)",
-            "userId": "uuid|@required|@ref:users.id",
-            "parentId": "uuid|@nullable|@ref:tasks.id"
+            "userId": "uuid|@required|@ref:users.id(delete:cascade,update:cascade)",
+            "parentId": "uuid|@nullable|@ref:tasks.id(delete:cascade,update:cascade)"
         },
         "users": {
-            "name": "string|@required",
-            "password": "string|@required|@default(password_hash())",
-            "role": "string|@default(user)|@values(admin, editor, user)"
+            "name": "string(255)|@required",
+            "email": "string(255)|@required|@unique",
+            "password": "string(255)|@required|@default(password_hash())",
+            "role": "enum(admin,editor,user)|@default(user)",
+            "age": "int",
+            "balance": "decimal(10,2)",
+            "isActive": "boolean|@default(true)"
+        },
+        "posts": {
+            "title": "string(512)|@required",
+            "slug": "string(512)|@required|@unique",
+            "content": "text",
+            "publishedAt": "datetime|@nullable",
+            "authorId": "uuid|@required|@ref:users.id(delete:restrict,update:no-action)",
+            "views": "int|@default(0)"
         }
     }
 }
