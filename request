@@ -1,0 +1,31 @@
+GET https://api.example.com/todoapp/tasks?with=user&completed=false&sort=-created_at&page=1
+Authorization: Bearer eyJ...
+X-Tenant: gosplan_a3f8c2d1-...
+
+1. .htaccess → index.php?project=todoapp&path=tasks
+2. Parser::parseFile('schemas/gosplan_todoapp.json')
+3. Auth::verify(token) → payload { userId, tenants: { "gosplan_a3f8c2d1": ["todoapp"] } }
+4. Connection::resolveTenant(payload, 'todoapp') → 'gosplan_a3f8c2d1' ✓
+5. Connection::system() → PDO a gosplan_system
+6. Connection::tenant('gosplan_a3f8c2d1') → PDO a gosplan_a3f8c2d1
+7. Router::resolve('tasks', 'GET') → { table: 'tasks', id: null, action: 'list' }
+8. Permissions::check(db, userId, 'todoapp', 'tasks', 'list') → mask & READ ✓
+9. Request::fromGlobals(schema, route, 'todoapp')
+   → parseFields()   → todos excepto @hidden
+   → parseWith()     → user (válido, existe @ref en schema)
+   → parseFilters()  → completed=false (@filterable ✓)
+   → parseSorting()  → created_at DESC
+   → parsePagination → page=1, limit=15
+10. Request::toFluent()
+    → Fluent::table('gosplan_a3f8c2d1.gosplan_todoapp_tasks')
+       ->select([...])
+       ->leftJoin('gosplan_todoapp_users', 'tasks.userId', 'users.id')
+       ->where('completed', false)
+       ->orderBy('created_at', 'DESC')
+       ->paginate(1, 15)
+       ->build()
+    → Query { statement: "SELECT ... FROM ...", values: [0, 15, 0] }
+11. Router::dispatch('list', query, tenantDb, schema)
+    → $stmt->execute()
+    → Response::paginated($data, $total, 1, 15)
+12. Log::write(...)
